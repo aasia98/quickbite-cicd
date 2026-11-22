@@ -79,11 +79,12 @@ jobs:
       - name: Prepare SSH connection
         env:
           SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+          EC2_HOST: ${{ secrets.EC2_HOST }}
         run: |
           mkdir -p ~/.ssh
           printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/quickbite.pem
           chmod 600 ~/.ssh/quickbite.pem
-          ssh-keyscan -H "${{ secrets.EC2_HOST }}" >> ~/.ssh/known_hosts
+          ssh-keyscan "$EC2_HOST" >> ~/.ssh/known_hosts
 
       - name: Deploy to EC2
         env:
