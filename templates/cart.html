@@ -1,0 +1,128 @@
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0">
+
+    <title>Shopping Cart - QuickBite</title>
+
+    <link rel="stylesheet"
+          href="{{ url_for('static', filename='style.css') }}">
+</head>
+
+<body>
+
+    <!-- HEADER -->
+    <header>
+        <h1>🛒 Your Shopping Cart</h1>
+        <p>Review your food items before checkout.</p>
+
+        <a href="{{ url_for('home') }}" class="cart-link">
+            ← Back to Menu
+        </a>
+    </header>
+
+    <!-- MAIN CART -->
+    <main>
+
+        {% if cart_items %}
+
+            {% for item in cart_items %}
+
+            <div class="cart-item">
+
+                <!-- FOOD IMAGE -->
+                <img
+                    src="{{ url_for('static',
+                        filename='images/' + item.image) }}"
+                    alt="{{ item.name }}"
+                    class="cart-image"
+                >
+
+                <!-- FOOD DETAILS -->
+                <div class="cart-details">
+
+                    <h3>{{ item.name }}</h3>
+
+                    <p>Price: Rs. {{ item.price }}</p>
+
+                    <p>Quantity: {{ item.quantity }}</p>
+
+                    <p>
+                        <strong>
+                            Subtotal: Rs. {{ item.subtotal }}
+                        </strong>
+                    </p>
+
+                </div>
+
+                <!-- REMOVE BUTTON -->
+                <form
+                    action="{{ url_for('remove_from_cart',
+                        item_id=item.id) }}"
+                    method="POST">
+
+                    <button type="submit" class="remove-btn">
+                        Remove
+                    </button>
+
+                </form>
+
+            </div>
+
+            {% endfor %}
+
+            <!-- TOTAL BILL -->
+            <div class="cart-summary">
+
+                <h2>Total Bill: Rs. {{ total }}</h2>
+
+                <!-- CLEAR CART -->
+                <form
+                    action="{{ url_for('clear_cart') }}"
+                    method="POST">
+
+                    <button type="submit" class="remove-btn">
+                        Clear Cart
+                    </button>
+
+                </form>
+
+                <!-- CHECKOUT -->
+                <a href="{{ url_for('checkout') }}" class="checkout-link">
+    Proceed to Checkout
+                </a>
+
+            </div>
+
+        {% else %}
+
+            <!-- EMPTY CART -->
+            <div class="empty-cart">
+
+                <h2>Your cart is empty!</h2>
+
+                <p>
+                    Add some delicious food from our menu.
+                </p>
+
+                <a href="{{ url_for('home') }}">
+                    Browse Menu
+                </a>
+
+            </div>
+
+        {% endif %}
+
+    </main>
+
+    <!-- FOOTER -->
+    <footer>
+        <p>QuickBite Food Delivery | DevOps Project</p>
+    </footer>
+
+</body>
+</html>
