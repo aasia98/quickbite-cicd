@@ -31,3 +31,24 @@ jobs:
       - name: Run automated tests
         run: |
           python -m pytest -v
+
+  build:
+    name: Build QuickBite ZIP
+    needs: test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4
+
+      - name: Create ZIP package
+        run: |
+          zip -r "quickbite-${GITHUB_SHA::7}.zip" \
+            app.py requirements.txt templates static
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: quickbite-build
+          path: quickbite-*.zip
+          retention-days: 7
