@@ -9,6 +9,9 @@ on:
     branches:
       - main
 
+permissions:
+  contents: read
+
 jobs:
   test:
     name: Run QuickBite Tests
@@ -32,9 +35,10 @@ jobs:
         run: |
           python -m pytest -v
 
-  build:
-    name: Build QuickBite ZIP
+  build-and-deploy:
+    name: Build, Upload to S3 and Deploy to EC2
     needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
 
     steps:
@@ -43,12 +47,70 @@ jobs:
 
       - name: Create ZIP package
         run: |
-          zip -r "quickbite-${GITHUB_SHA::7}.zip" \
+          zip -r "quickbite-${GITHUB_SHA}.zip" \
             app.py requirements.txt templates static
 
-      - name: Upload build artifact
+      - name: Save GitHub build artifact
         uses: actions/upload-artifact@v4
         with:
           name: quickbite-build
           path: quickbite-*.zip
           retention-days: 7
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Upload build to S3
+        run: |
+          aws s3 cp "quickbite-${GITHUB_SHA}.zip" \
+            "s3://${{ secrets.S3_BUCKET }}/builds/quickbite-${GITHUB_SHA}.zip"
+
+      - name: Generate temporary S3 download link
+        run: |
+          URL=$(aws s3 presign \
+            "s3://${{ secrets.S3_BUCKET }}/builds/quickbite-${GITHUB_SHA}.zip" \
+            --expires-in 3600)
+          echo "DEPLOY_URL=$URL" >> "$GITHUB_ENV"
+
+      - name: Prepare SSH connection
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/quickbite.pem
+          chmod 600 ~/.ssh/quickbite.pem
+          ssh-keyscan -H "${{ secrets.EC2_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Deploy to EC2
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ${{ secrets.EC2_USER }}
+        run: |
+          ssh -i ~/.ssh/quickbite.pem "$EC2_USER@$EC2_HOST" \
+            "DEPLOY_URL='$DEPLOY_URL' bash -s" <<'REMOTE'
+            set -e
+
+            cd /home/ubuntu/quickbite-cicd
+
+            curl -fL "$DEPLOY_URL" -o /tmp/quickbite.zip
+            unzip -o /tmp/quickbite.zip -d /home/ubuntu/quickbite-cicd
+
+            source /home/ubuntu/quickbite-cicd/venv/bin/activate
+            pip install -r requirements.txt
+
+            python -c "from app import init_db; init_db()"
+
+            sudo fuser -k 8000/tcp || true
+            sleep 2
+
+            gunicorn --bind 127.0.0.1:8000 --workers 2 --daemon app:app
+
+            sleep 3
+            curl -fsS http://127.0.0.1:8000/ > /dev/null
+
+            echo "QuickBite deployment successful!"
+          REMOTE
