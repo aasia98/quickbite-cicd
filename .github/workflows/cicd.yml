@@ -1,4 +1,4 @@
-# QuickBite automated CI/CD pipelinefff
+
 name: QuickBite CI/CD Pipeline
 
 on:
@@ -95,6 +95,8 @@ jobs:
 
             set -e
 
+            echo "Preparing application folder..."
+            mkdir -p /home/ubuntu/quickbite-cicd
             cd /home/ubuntu/quickbite-cicd
 
             echo "Downloading build from S3..."
@@ -103,9 +105,15 @@ jobs:
             echo "Extracting application..."
             unzip -o /tmp/quickbite.zip -d /home/ubuntu/quickbite-cicd
 
+            echo "Creating Python environment..."
+            if [ ! -d venv ]; then
+              python3 -m venv venv
+            fi
+
+            source venv/bin/activate
+
             echo "Installing dependencies..."
-            source /home/ubuntu/quickbite-cicd/venv/bin/activate
-            pip install -r requirements.txt
+            pip install -r requirements.txt gunicorn
 
             echo "Initializing database..."
             python -c "from app import init_db; init_db()"
